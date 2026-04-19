@@ -38,7 +38,7 @@ export default function PermissionGate({
     setStep("orientation");
     const ori = await requestOrientation();
     onOrientationResult(ori);
-    if (!ori) setError("方位センサーが利用できません（手動操作で動作します）");
+    if (!ori) setError("方位センサー未検出（後から有効になる場合があります）");
 
     setStep("geo");
     const geo = await requestGeo();

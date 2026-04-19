@@ -52,6 +52,13 @@ export default function ExplorePage() {
   const orientation = useDeviceOrientation();
   const camera = useCamera();
   const geo = useGeolocation();
+
+  // センサーが後から有効になった場合に自動切替
+  useEffect(() => {
+    if (!hasOrientation && orientation.available) {
+      setHasOrientation(true);
+    }
+  }, [hasOrientation, orientation.available]);
   const userPosition: GeoPosition = geo.position ?? {
     latitude: 35.68,
     longitude: 139.77,
@@ -282,7 +289,9 @@ export default function ExplorePage() {
       >
         <span>方位 {azimuth.toFixed(0)}°</span>
         <span>仰角 {altitude > 0 ? "+" : ""}{altitude.toFixed(0)}°</span>
-        {!hasOrientation && (
+        {hasOrientation ? (
+          <span style={{ color: "#a6e22e" }}>センサー有効</span>
+        ) : (
           <span style={{ color: "#67d8ef" }}>ドラッグで操作</span>
         )}
       </div>

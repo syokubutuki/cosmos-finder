@@ -103,12 +103,13 @@ export function useDeviceOrientation() {
 
     window.addEventListener(eventName, handleOrientation, true);
 
-    // イベントが実際に発火するかチェック
+    // イベントが実際に発火するかチェック（3秒待つ）
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
+        // タイムアウトしても listener は残す（後から有効になる場合に備える）
         setState((s) => ({ ...s, available: false }));
         resolve(false);
-      }, 1000);
+      }, 3000);
 
       const check = () => {
         clearTimeout(timeout);
