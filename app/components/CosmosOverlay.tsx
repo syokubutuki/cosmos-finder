@@ -7,7 +7,6 @@ import { formatDistance } from "../lib/distance-format";
 
 interface CosmosOverlayProps {
   visibleObjects: VisibleObject[];
-  onObjectTap: (obj: VisibleObject) => void;
   milkyWayPoints?: { x: number; y: number }[];
 }
 
@@ -20,22 +19,18 @@ const TYPE_SYMBOLS: Record<string, string> = {
   galaxy: "◈",
   "galaxy-cluster": "▣",
   quasar: "✸",
-  cmb: "∞",
 };
 
 export default function CosmosOverlay({
   visibleObjects,
-  onObjectTap,
   milkyWayPoints,
 }: CosmosOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const objectsRef = useRef<VisibleObject[]>(visibleObjects);
   const milkyWayRef = useRef(milkyWayPoints);
-  const tapHandlerRef = useRef(onObjectTap);
 
   objectsRef.current = visibleObjects;
   milkyWayRef.current = milkyWayPoints;
-  tapHandlerRef.current = onObjectTap;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -143,57 +138,16 @@ export default function CosmosOverlay({
     };
   }, [draw]);
 
-  // タップ検出
-  const handleClick = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      let clientX: number, clientY: number;
-      if ("touches" in e) {
-        const touch = e.changedTouches[0];
-        clientX = touch.clientX;
-        clientY = touch.clientY;
-      } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-      }
-
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
-
-      // 最も近い天体を検索
-      let closest: VisibleObject | null = null;
-      let minDist = 40; // タップ判定半径
-      for (const vo of objectsRef.current) {
-        const dx = vo.screenX - x;
-        const dy = vo.screenY - y;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < minDist) {
-          minDist = d;
-          closest = vo;
-        }
-      }
-
-      if (closest) {
-        tapHandlerRef.current(closest);
-      }
-    },
-    []
-  );
-
   return (
     <canvas
       ref={canvasRef}
-      onClick={handleClick}
-      onTouchEnd={handleClick}
       style={{
         position: "fixed",
         inset: 0,
         width: "100%",
         height: "100%",
         zIndex: 2,
-        touchAction: "none",
+        pointerEvents: "none",
       }}
     />
   );

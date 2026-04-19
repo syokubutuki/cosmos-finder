@@ -23,7 +23,6 @@ import CosmosOverlay from "../components/CosmosOverlay";
 import DistanceScale from "../components/DistanceScale";
 import LayerSelector from "../components/LayerSelector";
 import ObjectDetail from "../components/ObjectDetail";
-import CompassFallback from "../components/CompassFallback";
 
 const AU = 1.496e11;
 
@@ -36,17 +35,30 @@ export default function ExplorePage() {
     new Set(["earth-orbit", "solar-system", "galaxy", "deep-universe"])
   );
 
-  // フォールバック方位
-  const [fallbackAlpha, setFallbackAlpha] = useState(180);
-  const [fallbackBeta, setFallbackBeta] = useState(90);
+  // フォールバック方位（PCドラッグ操作）
+  const [fallbackAzimuth, setFallbackAzimuth] = useState(180);
+  const [fallbackAltitude, setFallbackAltitude] = useState(30);
+
+  // canvas / 画面サイズ（stateで管理してuseMemo再計算をトリガー）
+  const [canvasSize, setCanvasSize] = useState({ w: 400, h: 800 });
+  useEffect(() => {
+    const update = () =>
+      setCanvasSize({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const orientation = useDeviceOrientation();
   const camera = useCamera();
   const geo = useGeolocation();
-  const userPosition: GeoPosition = geo.position ?? { latitude: 35.68, longitude: 139.77 }; // デフォルト: 東京
+  const userPosition: GeoPosition = geo.position ?? {
+    latitude: 35.68,
+    longitude: 139.77,
+  };
   const iss = useISS(permissionDone ? userPosition : null);
 
-  // 惑星位置（1分ごと更新）
+  // ─── 惑星位置（1分ごと更新）─────────────────────
   const [planetPositions, setPlanetPositions] = useState<
     Map<string, { ra: number; dec: number; distanceM?: number }>
   >(new Map());
@@ -54,53 +66,50 @@ export default function ExplorePage() {
   const updatePlanets = useCallback(() => {
     const now = new Date();
     const map = new Map<string, { ra: number; dec: number; distanceM?: number }>();
-
-    // 惑星
-    for (const id of ["mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"]) {
+    for (const id of [
+      "mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune",
+    ]) {
       const pos = getPlanetPosition(id, now);
-      if (pos) {
-        map.set(id, { ra: pos.ra, dec: pos.dec, distanceM: pos.distanceAU * AU });
-      }
+      if (pos) map.set(id, { ra: pos.ra, dec: pos.dec, distanceM: pos.distanceAU * AU });
     }
-
-    // 太陽
-    const sun = getSunPosition(now);
-    map.set("sun", { ra: sun.ra, dec: sun.dec });
-
-    // 月
-    const moon = getMoonPosition(now);
-    map.set("moon", { ra: moon.ra, dec: moon.dec });
-
+    map.set("sun", getSunPosition(now));
+    map.set("moon", getMoonPosition(now));
     setPlanetPositions(map);
   }, []);
 
   useEffect(() => {
     updatePlanets();
-    const timer = setInterval(updatePlanets, 60000);
-    return () => clearInterval(timer);
+    const t = setInterval(updatePlanets, 60000);
+    return () => clearInterval(t);
   }, [updatePlanets]);
 
-  // ISS位置を動的ポジションに追加
+  // ISS → 動的ポジション統合
   const dynamicPositions = useMemo(() => {
     const map = new Map(planetPositions);
     if (iss.ra !== null && iss.dec !== null && iss.visible) {
-      map.set("iss", {
-        ra: iss.ra,
-        dec: iss.dec,
-        distanceM: iss.distanceM ?? 408000,
-      });
+      map.set("iss", { ra: iss.ra, dec: iss.dec, distanceM: iss.distanceM ?? 408000 });
     }
     return map;
   }, [planetPositions, iss]);
 
-  // 方位角・仰角 → RA/Dec
-  const alpha = hasOrientation ? orientation.alpha : fallbackAlpha;
-  const beta = hasOrientation ? orientation.beta : fallbackBeta;
+  // ─── 方位 → 天球座標 ───────────────────────────
+  const azimuth = hasOrientation
+    ? deviceOrientationToAzAlt(
+        orientation.alpha,
+        orientation.beta,
+        0,
+        orientation.isIOS
+      ).azimuth
+    : fallbackAzimuth;
 
-  const { azimuth, altitude } = useMemo(
-    () => deviceOrientationToAzAlt(alpha, beta, 0, orientation.isIOS),
-    [alpha, beta, orientation.isIOS]
-  );
+  const altitude = hasOrientation
+    ? deviceOrientationToAzAlt(
+        orientation.alpha,
+        orientation.beta,
+        0,
+        orientation.isIOS
+      ).altitude
+    : fallbackAltitude;
 
   const { ra: centerRA, dec: centerDec } = useMemo(
     () =>
@@ -111,66 +120,97 @@ export default function ExplorePage() {
         userPosition.longitude,
         new Date()
       ),
-    [azimuth, altitude, userPosition]
+    [azimuth, altitude, userPosition.latitude, userPosition.longitude]
   );
 
-  const canvasSize = useRef({ w: 0, h: 0 });
-  useEffect(() => {
-    const update = () => {
-      canvasSize.current = {
-        w: window.innerWidth,
-        h: window.innerHeight,
-      };
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
+  // ─── 可視天体検索 ──────────────────────────────
   const visibleObjects = useCelestialSearch({
     centerRA,
     centerDec,
-    canvasWidth: canvasSize.current.w || 400,
-    canvasHeight: canvasSize.current.h || 800,
+    canvasWidth: canvasSize.w,
+    canvasHeight: canvasSize.h,
     activeLayers,
     dynamicPositions,
   });
 
   const milkyWayPoints = useMemo(
-    () =>
-      getMilkyWayScreenPoints(
-        centerRA,
-        centerDec,
-        canvasSize.current.w || 400,
-        canvasSize.current.h || 800
-      ),
-    [centerRA, centerDec]
+    () => getMilkyWayScreenPoints(centerRA, centerDec, canvasSize.w, canvasSize.h),
+    [centerRA, centerDec, canvasSize.w, canvasSize.h]
   );
 
+  // ─── 操作レイヤー: ドラッグ + タップ ─────────────
+  const isDragging = useRef(false);
+  const dragMoved = useRef(false);
+  const lastPointer = useRef({ x: 0, y: 0 });
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    isDragging.current = true;
+    dragMoved.current = false;
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDragging.current) return;
+      const dx = e.clientX - lastPointer.current.x;
+      const dy = e.clientY - lastPointer.current.y;
+      lastPointer.current = { x: e.clientX, y: e.clientY };
+
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragMoved.current = true;
+
+      if (!hasOrientation) {
+        setFallbackAzimuth((a) => ((a - dx * 0.3) % 360 + 360) % 360);
+        setFallbackAltitude((a) => Math.max(-90, Math.min(90, a + dy * 0.3)));
+      }
+    },
+    [hasOrientation]
+  );
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      isDragging.current = false;
+
+      // ドラッグせずリリース → タップとして天体検索
+      if (!dragMoved.current) {
+        const x = e.clientX;
+        const y = e.clientY;
+        let closest: VisibleObject | null = null;
+        let minDist = 40;
+        for (const vo of visibleObjects) {
+          const dx = vo.screenX - x;
+          const dy = vo.screenY - y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < minDist) {
+            minDist = d;
+            closest = vo;
+          }
+        }
+        if (closest) {
+          setSelectedObject(closest);
+        } else {
+          setSelectedObject(null);
+        }
+      }
+    },
+    [visibleObjects]
+  );
+
+  // ─── UI ──────────────────────────────────────
   const handleLayerToggle = useCallback((layer: DistanceLayer) => {
     setActiveLayers((prev) => {
       const next = new Set(prev);
-      if (next.has(layer)) {
-        next.delete(layer);
-      } else {
-        next.add(layer);
-      }
+      if (next.has(layer)) next.delete(layer);
+      else next.add(layer);
       return next;
     });
   }, []);
 
-  const handleObjectTap = useCallback((obj: VisibleObject) => {
+  const handleScaleTap = useCallback((obj: VisibleObject) => {
     setSelectedObject(obj);
   }, []);
 
-  const handleFallbackOrientation = useCallback(
-    (a: number, b: number) => {
-      setFallbackAlpha(a);
-      setFallbackBeta(b);
-    },
-    []
-  );
-
+  // ─── 許可フロー ──────────────────────────────
   if (!permissionDone) {
     return (
       <PermissionGate
@@ -187,26 +227,31 @@ export default function ExplorePage() {
 
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "hidden" }}>
-      {/* レイヤー0: カメラ or 星空 */}
+      {/* レイヤー0: カメラ or 星空背景 */}
       <CameraView stream={camera.stream} available={hasCamera} />
 
-      {/* フォールバック操作レイヤー */}
-      {!hasOrientation && (
-        <CompassFallback onOrientationChange={handleFallbackOrientation} />
-      )}
-
-      {/* レイヤー2: Canvas天体オーバーレイ */}
+      {/* レイヤー2: Canvas天体オーバーレイ（描画専用・イベント透過） */}
       <CosmosOverlay
         visibleObjects={visibleObjects}
-        onObjectTap={handleObjectTap}
         milkyWayPoints={milkyWayPoints}
       />
 
-      {/* 距離スケールバー */}
-      <DistanceScale
-        visibleObjects={visibleObjects}
-        onObjectTap={handleObjectTap}
+      {/* 最上位操作レイヤー: ドラッグ + タップ */}
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 3,
+          cursor: hasOrientation ? "default" : "grab",
+          touchAction: "none",
+        }}
       />
+
+      {/* 距離スケールバー */}
+      <DistanceScale visibleObjects={visibleObjects} onObjectTap={handleScaleTap} />
 
       {/* レイヤー切替 */}
       <LayerSelector activeLayers={activeLayers} onToggle={handleLayerToggle} />
@@ -217,26 +262,29 @@ export default function ExplorePage() {
         onClose={() => setSelectedObject(null)}
       />
 
-      {/* 方位表示（センサーあり時） */}
-      {hasOrientation && (
-        <div
-          style={{
-            position: "fixed",
-            top: 12,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 15,
-            background: "rgba(20,20,42,0.7)",
-            padding: "4px 14px",
-            borderRadius: "1rem",
-            fontSize: "0.7rem",
-            color: "#8888aa",
-          }}
-        >
-          {azimuth.toFixed(0)}° / {altitude > 0 ? "+" : ""}
-          {altitude.toFixed(0)}°
-        </div>
-      )}
+      {/* 方位表示 */}
+      <div
+        style={{
+          position: "fixed",
+          top: 12,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 15,
+          display: "flex",
+          gap: 16,
+          background: "rgba(20,20,42,0.8)",
+          padding: "6px 16px",
+          borderRadius: "1rem",
+          fontSize: "0.75rem",
+          color: "#8888aa",
+        }}
+      >
+        <span>方位 {azimuth.toFixed(0)}°</span>
+        <span>仰角 {altitude.toFixed(0)}°</span>
+        {!hasOrientation && (
+          <span style={{ color: "#67d8ef" }}>ドラッグで操作</span>
+        )}
+      </div>
     </div>
   );
 }

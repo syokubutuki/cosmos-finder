@@ -49,11 +49,8 @@ export function useCelestialSearch(params: SearchParams): VisibleObject[] {
         }
       }
 
-      // CMBは全方向にあるので常に表示
-      if (obj.type === "cmb") {
-        candidates.push({ object: { ...obj, ra: centerRA, dec: centerDec, distanceM }, angDist: 0, ra: centerRA, dec: centerDec });
-        continue;
-      }
+      // CMBは除外（全方向に存在する背景放射なので個別天体として表示しない）
+      if (obj.type === "cmb") continue;
 
       const angDist = angularDistance(centerRA, centerDec, ra, dec);
       if (angDist <= FOV_DEG) {
