@@ -23,6 +23,45 @@ export function getLocalSiderealTime(date: Date, lonDeg: number): number {
 }
 
 /**
+ * DeviceOrientation → カメラが向いている方位角・仰角
+ *
+ * 回転行列 R = Rz(α) × Rx(β) × Ry(γ) でカメラの向き (0,0,-1) を
+ * 地球座標 (X=東, Y=北, Z=上) に変換する。
+ *
+ * @param compassHeading コンパスヘディング（真北から時計回り, 0-360°）
+ * @param beta  前後傾斜 (-180〜180°, 0=水平, 90=垂直)
+ * @param gamma 左右傾斜 (-90〜90°)
+ * @returns azimuth (真北CW, 0-360°), altitude (水平0°, 天頂+90°)
+ */
+export function deviceOrientationToAzAlt(
+  compassHeading: number,
+  beta: number,
+  gamma: number
+): { azimuth: number; altitude: number } {
+  // コンパスヘディング(CW) → W3C alpha(CCW) に変換してラジアン化
+  const a = ((360 - compassHeading) % 360) * DEG;
+  const b = beta * DEG;
+  const g = gamma * DEG;
+
+  // カメラ方向 (0, 0, -1) に回転行列 Rz(a)·Rx(b)·Ry(g) を適用
+  // 結果: 地球座標系 (X=東, Y=北, Z=上) でのカメラ方向ベクトル
+  const xEast =
+    -Math.cos(a) * Math.sin(g) - Math.sin(a) * Math.sin(b) * Math.cos(g);
+  const yNorth =
+    -Math.sin(a) * Math.sin(g) + Math.cos(a) * Math.sin(b) * Math.cos(g);
+  const zUp = -Math.cos(b) * Math.cos(g);
+
+  // 方位角: 北から時計回り
+  let azimuth = Math.atan2(xEast, yNorth) * RAD;
+  azimuth = ((azimuth % 360) + 360) % 360;
+
+  // 仰角: 水平面からの角度
+  const altitude = Math.asin(Math.max(-1, Math.min(1, zUp))) * RAD;
+
+  return { azimuth, altitude };
+}
+
+/**
  * 方位角(azimuth, 北=0, 東=90)・仰角(altitude) → 赤経(RA)・赤緯(Dec)
  * すべて度単位
  */
@@ -72,7 +111,7 @@ export function raDecToAzAlt(
   const dec = decDeg * DEG;
 
   const lst = getLocalSiderealTime(date, lonDeg);
-  let H = (lst - raDeg) * DEG;
+  const H = (lst - raDeg) * DEG;
 
   const sinAlt =
     Math.sin(dec) * Math.sin(lat) +
@@ -92,45 +131,19 @@ export function raDecToAzAlt(
  * 2天体間の角距離（度）
  */
 export function angularDistance(
-  ra1: number, dec1: number,
-  ra2: number, dec2: number
+  ra1: number,
+  dec1: number,
+  ra2: number,
+  dec2: number
 ): number {
-  const r1 = ra1 * DEG, d1 = dec1 * DEG;
-  const r2 = ra2 * DEG, d2 = dec2 * DEG;
+  const r1 = ra1 * DEG,
+    d1 = dec1 * DEG;
+  const r2 = ra2 * DEG,
+    d2 = dec2 * DEG;
 
   const cosDist =
     Math.sin(d1) * Math.sin(d2) +
     Math.cos(d1) * Math.cos(d2) * Math.cos(r1 - r2);
 
   return Math.acos(Math.max(-1, Math.min(1, cosDist))) * RAD;
-}
-
-/**
- * DeviceOrientationイベント → 方位角・仰角に変換
- */
-export function deviceOrientationToAzAlt(
-  alpha: number,
-  beta: number,
-  gamma: number,
-  isIOS: boolean
-): { azimuth: number; altitude: number } {
-  // alpha: コンパスヘディング（iOSではwebkitCompassHeading使用）
-  // beta: 前後傾斜 (-180~180)
-  // gamma: 左右傾斜 (-90~90)
-
-  let azimuth: number;
-  if (isIOS) {
-    // iOSではalphaがwebkitCompassHeadingから取得される（真北基準）
-    azimuth = alpha;
-  } else {
-    // Androidのalphaは磁北基準で反転
-    azimuth = (360 - alpha) % 360;
-  }
-
-  // 仰角: betaがデバイスの傾きを表す
-  // スマホを垂直に持つ(beta=90)が水平方向(altitude=0)
-  // スマホを上向き(beta=0)が天頂(altitude=90)
-  const altitude = 90 - beta;
-
-  return { azimuth, altitude };
 }

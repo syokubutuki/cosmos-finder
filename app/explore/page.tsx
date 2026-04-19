@@ -39,7 +39,7 @@ export default function ExplorePage() {
   const [fallbackAzimuth, setFallbackAzimuth] = useState(180);
   const [fallbackAltitude, setFallbackAltitude] = useState(30);
 
-  // canvas / 画面サイズ（stateで管理してuseMemo再計算をトリガー）
+  // 画面サイズ（stateで管理して再計算をトリガー）
   const [canvasSize, setCanvasSize] = useState({ w: 400, h: 800 });
   useEffect(() => {
     const update = () =>
@@ -92,25 +92,27 @@ export default function ExplorePage() {
     return map;
   }, [planetPositions, iss]);
 
-  // ─── 方位 → 天球座標 ───────────────────────────
-  const azimuth = hasOrientation
-    ? deviceOrientationToAzAlt(
-        orientation.alpha,
+  // ─── デバイス方位 → 方位角・仰角 ──────────────────
+  // 回転行列でカメラの3D向きから正確にaz/altを算出
+  const { azimuth, altitude } = useMemo(() => {
+    if (hasOrientation) {
+      return deviceOrientationToAzAlt(
+        orientation.alpha,  // コンパスヘディング（hookで正規化済み）
         orientation.beta,
-        0,
-        orientation.isIOS
-      ).azimuth
-    : fallbackAzimuth;
+        orientation.gamma
+      );
+    }
+    return { azimuth: fallbackAzimuth, altitude: fallbackAltitude };
+  }, [
+    hasOrientation,
+    orientation.alpha,
+    orientation.beta,
+    orientation.gamma,
+    fallbackAzimuth,
+    fallbackAltitude,
+  ]);
 
-  const altitude = hasOrientation
-    ? deviceOrientationToAzAlt(
-        orientation.alpha,
-        orientation.beta,
-        0,
-        orientation.isIOS
-      ).altitude
-    : fallbackAltitude;
-
+  // ─── 方位角・仰角 → 赤経・赤緯 ──────────────────
   const { ra: centerRA, dec: centerDec } = useMemo(
     () =>
       azAltToRaDec(
@@ -196,7 +198,6 @@ export default function ExplorePage() {
     [visibleObjects]
   );
 
-  // ─── UI ──────────────────────────────────────
   const handleLayerToggle = useCallback((layer: DistanceLayer) => {
     setActiveLayers((prev) => {
       const next = new Set(prev);
@@ -227,10 +228,10 @@ export default function ExplorePage() {
 
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "hidden" }}>
-      {/* レイヤー0: カメラ or 星空背景 */}
+      {/* カメラ or 星空背景 */}
       <CameraView stream={camera.stream} available={hasCamera} />
 
-      {/* レイヤー2: Canvas天体オーバーレイ（描画専用・イベント透過） */}
+      {/* Canvas天体オーバーレイ（描画専用・イベント透過） */}
       <CosmosOverlay
         visibleObjects={visibleObjects}
         milkyWayPoints={milkyWayPoints}
@@ -262,7 +263,7 @@ export default function ExplorePage() {
         onClose={() => setSelectedObject(null)}
       />
 
-      {/* 方位表示 */}
+      {/* 方位・仰角表示 */}
       <div
         style={{
           position: "fixed",
@@ -280,7 +281,7 @@ export default function ExplorePage() {
         }}
       >
         <span>方位 {azimuth.toFixed(0)}°</span>
-        <span>仰角 {altitude.toFixed(0)}°</span>
+        <span>仰角 {altitude > 0 ? "+" : ""}{altitude.toFixed(0)}°</span>
         {!hasOrientation && (
           <span style={{ color: "#67d8ef" }}>ドラッグで操作</span>
         )}
