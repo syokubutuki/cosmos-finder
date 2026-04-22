@@ -35,8 +35,9 @@ export function gnomonicProject(
     return { x: 0, y: 0, visible: false };
   }
 
+  // 天球を内側から見るため x 軸を反転（東=画面左）
   const x =
-    (Math.cos(d) * Math.sin(r - r0)) / cosc;
+    -(Math.cos(d) * Math.sin(r - r0)) / cosc;
   const y =
     (Math.cos(d0) * Math.sin(d) -
       Math.sin(d0) * Math.cos(d) * Math.cos(r - r0)) /
