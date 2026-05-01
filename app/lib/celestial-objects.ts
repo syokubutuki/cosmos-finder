@@ -23,12 +23,13 @@ export const CELESTIAL_OBJECTS: CelestialObject[] = [
     id: "himawari",
     name: "ひまわり9号",
     nameEn: "Himawari-9",
-    ra: 140.7,
+    ra: 0,
     dec: 0,
     distanceM: 35786 * KM,
     type: "satellite",
     layer: "earth-orbit",
     description: "東経140.7度の静止軌道上にある気象観測衛星。",
+    dynamic: true,
   },
 
   // ===== 太陽系 =====

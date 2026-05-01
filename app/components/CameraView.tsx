@@ -45,26 +45,39 @@ function FallbackStarfield() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const drawStars = () => {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    ctx.fillStyle = "#0a0a12";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
 
-    // ランダムな星
-    for (let i = 0; i < 200; i++) {
-      const x = Math.random() * canvas.width;
-      const y = Math.random() * canvas.height;
-      const r = Math.random() * 1.5 + 0.5;
-      const alpha = Math.random() * 0.7 + 0.3;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-      ctx.fill();
-    }
+      ctx.fillStyle = "#0a0a12";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 固定シードで再現性のある星配置
+      let seed = 12345;
+      const seededRandom = () => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+
+      for (let i = 0; i < 200; i++) {
+        const x = seededRandom() * canvas.width;
+        const y = seededRandom() * canvas.height;
+        const r = seededRandom() * 1.5 + 0.5;
+        const alpha = seededRandom() * 0.7 + 0.3;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.fill();
+      }
+    };
+
+    drawStars();
+    window.addEventListener("resize", drawStars);
+    return () => window.removeEventListener("resize", drawStars);
   }, []);
 
   return (

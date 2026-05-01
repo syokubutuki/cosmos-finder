@@ -48,11 +48,11 @@ function getLightTravelTime(distanceM: number): string {
   if (seconds < 86400 * 365.25) return `光で${(seconds / 86400).toFixed(1)}日`;
 
   const years = seconds / (86400 * 365.25);
-  if (years < 1e4) return `光で${years.toFixed(0)}年前に出発した光`;
-  if (years < 1e6) return `${(years / 1e4).toFixed(1)}万年前に出発した光`;
-  if (years < 1e8) return `${(years / 1e6).toFixed(0)}百万年前に出発した光`;
-  if (years < 1e9) return `${(years / 1e8).toFixed(1)}億年前に出発した光`;
-  return `${(years / 1e9).toFixed(1)}0億年前に出発した光`;
+  if (years < 1e4) return `${years.toFixed(0)}年前の光`;
+  if (years < 1e6) return `${(years / 1e4).toFixed(1)}万年前の光`;
+  if (years < 1e8) return `${(years / 1e4).toFixed(0)}万年前の光`;
+  if (years < 1e9) return `${(years / 1e8).toFixed(1)}億年前の光`;
+  return `${(years / 1e8).toFixed(0)}億年前の光`;
 }
 
 function generateMetaphor(distanceM: number): string | undefined {

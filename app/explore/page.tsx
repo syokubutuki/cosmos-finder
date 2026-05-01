@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { getLocalSiderealTime } from "../lib/coordinates";
 import { DistanceLayer, VisibleObject, GeoPosition } from "../lib/types";
 import {
   azAltToRaDec,
@@ -65,6 +66,13 @@ export default function ExplorePage() {
   };
   const iss = useISS(permissionDone ? userPosition : null);
 
+  // ─── 時刻トラッカー（10秒ごとに更新してRA/Dec再計算をトリガー）────
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setCurrentTime(Date.now()), 10000);
+    return () => clearInterval(t);
+  }, []);
+
   // ─── 惑星位置（1分ごと更新）─────────────────────
   const [planetPositions, setPlanetPositions] = useState<
     Map<string, { ra: number; dec: number; distanceM?: number }>
@@ -81,6 +89,12 @@ export default function ExplorePage() {
     }
     map.set("sun", getSunPosition(now));
     map.set("moon", getMoonPosition(now));
+
+    // ひまわり9号: 東経140.7°の静止軌道 → RAは地方恒星時から算出
+    const himawariLon = 140.7;
+    const himawariRA = getLocalSiderealTime(now, himawariLon);
+    map.set("himawari", { ra: himawariRA, dec: 0, distanceM: 35786e3 });
+
     setPlanetPositions(map);
   }, []);
 
@@ -127,9 +141,9 @@ export default function ExplorePage() {
         altitude,
         userPosition.latitude,
         userPosition.longitude,
-        new Date()
+        new Date(currentTime)
       ),
-    [azimuth, altitude, userPosition.latitude, userPosition.longitude]
+    [azimuth, altitude, userPosition.latitude, userPosition.longitude, currentTime]
   );
 
   // ─── 可視天体検索 ──────────────────────────────

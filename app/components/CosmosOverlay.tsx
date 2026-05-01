@@ -32,6 +32,8 @@ export default function CosmosOverlay({
   objectsRef.current = visibleObjects;
   milkyWayRef.current = milkyWayPoints;
 
+  const rafIdRef = useRef(0);
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -116,7 +118,7 @@ export default function CosmosOverlay({
       ctx.fillText(distLabel, labelX, labelY + 15);
     }
 
-    requestAnimationFrame(draw);
+    rafIdRef.current = requestAnimationFrame(draw);
   }, []);
 
   useEffect(() => {
@@ -130,11 +132,11 @@ export default function CosmosOverlay({
     resize();
     window.addEventListener("resize", resize);
 
-    const rafId = requestAnimationFrame(draw);
+    rafIdRef.current = requestAnimationFrame(draw);
 
     return () => {
       window.removeEventListener("resize", resize);
-      cancelAnimationFrame(rafId);
+      cancelAnimationFrame(rafIdRef.current);
     };
   }, [draw]);
 

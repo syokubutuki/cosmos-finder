@@ -21,20 +21,13 @@ export function formatDistance(distanceM: number): FormattedDistance {
     return fmt(manKm, "万km");
   }
 
-  // < 100AU → AU
-  if (distanceM < 100 * AU) {
-    const au = distanceM / AU;
-    return fmt(au, "AU");
-  }
-
-  // < 1光年 → 光時/光分
+  // < 1光年 → AU
   if (distanceM < 1 * LY) {
-    const lightHours = distanceM / (2.998e8 * 3600);
-    if (lightHours < 1) {
-      const lightMin = lightHours * 60;
-      return fmt(lightMin, "光分");
-    }
-    return fmt(lightHours, "光時");
+    const au = distanceM / AU;
+    if (au < 100) return fmt(au, "AU");
+    // 100AU以上は光日で表示
+    const lightDays = distanceM / (2.998e8 * 86400);
+    return fmt(lightDays, "光日");
   }
 
   // < 1,000光年 → 光年

@@ -9,7 +9,7 @@ interface ISSPosition {
  */
 export async function fetchISSPosition(): Promise<ISSPosition | null> {
   try {
-    const res = await fetch("http://api.open-notify.org/iss-now.json", {
+    const res = await fetch("https://api.open-notify.org/iss-now.json", {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;

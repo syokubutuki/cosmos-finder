@@ -54,11 +54,13 @@ export function useISS(userPosition: GeoPosition | null) {
     // ISS距離を概算（仰角から）
     const issAltKm = 408;
     const R = 6371;
-    const distKm =
-      Math.sqrt(
-        (R + issAltKm) ** 2 - (R * Math.cos(altitude * (Math.PI / 180))) ** 2
-      ) -
-      R * Math.sin(altitude * (Math.PI / 180));
+    const altRad = altitude * (Math.PI / 180);
+    const cosAlt = Math.cos(altRad);
+    const sinAlt = Math.sin(altRad);
+    const sqrtArg = (R + issAltKm) ** 2 - (R * cosAlt) ** 2;
+    const distKm = sqrtArg > 0
+      ? Math.sqrt(sqrtArg) - R * sinAlt
+      : issAltKm;
 
     setState({
       ra,
