@@ -1,20 +1,17 @@
 /**
  * 天の川帯の画面座標を計算
- * 銀河面（銀緯0°）のラインを赤道座標に変換し、画面に射影する
+ * 銀河面（銀緯0°）のラインを赤道座標に変換し、Az/Altで画面に射影する
  */
 
-import { gnomonicProject, normalizedToScreen } from "../lib/projection";
+import { raDecToAzAlt } from "../lib/coordinates";
+import { gnomonicProjectAzAlt, normalizedToScreen } from "../lib/projection";
 
 const DEG = Math.PI / 180;
 
-// 銀河面の赤道座標（銀緯0°のラインをサンプリング）
-// 銀河座標 → 赤道座標変換の事前計算値
-const GALACTIC_PLANE_POINTS: { ra: number; dec: number }[] = [];
-
 // 銀河座標系の定数
-const RA_GP = 192.85948; // 銀河北極の赤経
-const DEC_GP = 27.12825; // 銀河北極の赤緯
-const L_NCP = 122.93192; // 天の北極の銀経
+const RA_GP = 192.85948;
+const DEC_GP = 27.12825;
+const L_NCP = 122.93192;
 
 function galacticToEquatorial(l: number, b: number): { ra: number; dec: number } {
   const lr = l * DEG;
@@ -39,21 +36,27 @@ function galacticToEquatorial(l: number, b: number): { ra: number; dec: number }
 }
 
 // 銀経0°〜360°を10°刻みでサンプリング
+const GALACTIC_PLANE_POINTS: { ra: number; dec: number }[] = [];
 for (let l = 0; l <= 360; l += 10) {
   GALACTIC_PLANE_POINTS.push(galacticToEquatorial(l, 0));
 }
 
 export function getMilkyWayScreenPoints(
-  centerRA: number,
-  centerDec: number,
+  centerAz: number,
+  centerAlt: number,
+  latitude: number,
+  longitude: number,
+  currentTime: number,
   canvasWidth: number,
   canvasHeight: number,
   fovDeg: number = 60
 ): { x: number; y: number }[] {
+  const now = new Date(currentTime);
   const points: { x: number; y: number }[] = [];
 
   for (const pt of GALACTIC_PLANE_POINTS) {
-    const proj = gnomonicProject(pt.ra, pt.dec, centerRA, centerDec);
+    const { azimuth, altitude } = raDecToAzAlt(pt.ra, pt.dec, latitude, longitude, now);
+    const proj = gnomonicProjectAzAlt(azimuth, altitude, centerAz, centerAlt);
     if (!proj.visible) continue;
 
     const screen = normalizedToScreen(proj.x, proj.y, canvasWidth, canvasHeight, fovDeg);

@@ -11,36 +11,35 @@ export interface ProjectedPoint {
 }
 
 /**
- * 接線面射影 (gnomonic projection)
- * 視野中心(centerRA, centerDec) と 天体(ra, dec) → 画面座標
- * 返り値: 正規化座標 (-1〜1 が視野内)
+ * 方位角/仰角座標系での接線面射影 (gnomonic projection)
+ *
+ * Az/Alt系で投影することで、スマホの物理的な向きと画面の軸が常に一致する。
+ * - x正方向 = 画面右 = 方位角増加方向（時計回り）
+ * - y正方向 = 画面上 = 仰角増加方向
  */
-export function gnomonicProject(
-  ra: number,
-  dec: number,
-  centerRA: number,
-  centerDec: number
+export function gnomonicProjectAzAlt(
+  az: number,
+  alt: number,
+  centerAz: number,
+  centerAlt: number
 ): ProjectedPoint {
-  const r = ra * DEG;
-  const d = dec * DEG;
-  const r0 = centerRA * DEG;
-  const d0 = centerDec * DEG;
+  const a = az * DEG;
+  const e = alt * DEG;
+  const a0 = centerAz * DEG;
+  const e0 = centerAlt * DEG;
 
   const cosc =
-    Math.sin(d0) * Math.sin(d) +
-    Math.cos(d0) * Math.cos(d) * Math.cos(r - r0);
+    Math.sin(e0) * Math.sin(e) +
+    Math.cos(e0) * Math.cos(e) * Math.cos(a - a0);
 
-  // 視野の裏側にある天体
   if (cosc <= 0) {
     return { x: 0, y: 0, visible: false };
   }
 
-  // 天球を内側から見るため x 軸を反転（東=画面左）
-  const x =
-    -(Math.cos(d) * Math.sin(r - r0)) / cosc;
+  const x = (Math.cos(e) * Math.sin(a - a0)) / cosc;
   const y =
-    (Math.cos(d0) * Math.sin(d) -
-      Math.sin(d0) * Math.cos(d) * Math.cos(r - r0)) /
+    (Math.cos(e0) * Math.sin(e) -
+      Math.sin(e0) * Math.cos(e) * Math.cos(a - a0)) /
     cosc;
 
   return { x, y, visible: true };

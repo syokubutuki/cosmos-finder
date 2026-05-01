@@ -1,12 +1,8 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { getLocalSiderealTime } from "../lib/coordinates";
+import { getLocalSiderealTime, deviceOrientationToAzAlt } from "../lib/coordinates";
 import { DistanceLayer, VisibleObject, GeoPosition } from "../lib/types";
-import {
-  azAltToRaDec,
-  deviceOrientationToAzAlt,
-} from "../lib/coordinates";
 import {
   getPlanetPosition,
   getSunPosition,
@@ -133,23 +129,13 @@ export default function ExplorePage() {
     fallbackAltitude,
   ]);
 
-  // ─── 方位角・仰角 → 赤経・赤緯 ──────────────────
-  const { ra: centerRA, dec: centerDec } = useMemo(
-    () =>
-      azAltToRaDec(
-        azimuth,
-        altitude,
-        userPosition.latitude,
-        userPosition.longitude,
-        new Date(currentTime)
-      ),
-    [azimuth, altitude, userPosition.latitude, userPosition.longitude, currentTime]
-  );
-
-  // ─── 可視天体検索 ──────────────────────────────
+  // ─── 可視天体検索（Az/Alt座標系で射影）──────────────
   const visibleObjects = useCelestialSearch({
-    centerRA,
-    centerDec,
+    centerAz: azimuth,
+    centerAlt: altitude,
+    latitude: userPosition.latitude,
+    longitude: userPosition.longitude,
+    currentTime,
     canvasWidth: canvasSize.w,
     canvasHeight: canvasSize.h,
     activeLayers,
@@ -157,8 +143,12 @@ export default function ExplorePage() {
   });
 
   const milkyWayPoints = useMemo(
-    () => getMilkyWayScreenPoints(centerRA, centerDec, canvasSize.w, canvasSize.h),
-    [centerRA, centerDec, canvasSize.w, canvasSize.h]
+    () => getMilkyWayScreenPoints(
+      azimuth, altitude,
+      userPosition.latitude, userPosition.longitude, currentTime,
+      canvasSize.w, canvasSize.h
+    ),
+    [azimuth, altitude, userPosition.latitude, userPosition.longitude, currentTime, canvasSize.w, canvasSize.h]
   );
 
   // ─── 操作レイヤー: ドラッグ + タップ ─────────────
